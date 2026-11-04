@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Tesla The Fly</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;900&display=swap" rel="stylesheet">
 <style>
 :root{color-scheme:dark;--c:#00e5ff;--m:#ff2bd6}
-html,body{margin:0;height:100%;background:#000;overflow:hidden;font-family:'Orbitron','Segoe UI',system-ui,sans-serif;color:#fff}
+html,body{touch-action:none;overscroll-behavior:none;-webkit-user-select:none;user-select:none;margin:0;height:100%;background:#000;overflow:hidden;font-family:'Orbitron','Segoe UI',system-ui,sans-serif;color:#fff}
 canvas{display:block}
 #hud{position:fixed;inset:0;pointer-events:none;display:none}
 .pill{position:absolute;padding:8px 14px;border:1px solid var(--c);border-radius:10px;background:rgba(0,10,25,.6);box-shadow:0 0 14px rgba(0,229,255,.4);font-size:14px;letter-spacing:1px}
@@ -29,6 +29,14 @@ button{font:inherit;font-weight:700;letter-spacing:2px;color:#fff;background:rgb
 button:hover,button.sel{background:var(--c);color:#001;box-shadow:0 0 28px var(--c)}
 #go{border-color:var(--m);box-shadow:0 0 14px rgba(255,43,214,.5);font-size:20px}
 #go:hover{background:var(--m);box-shadow:0 0 30px var(--m)}
+.tb{pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none;width:76px;height:76px;border-radius:50%;border:2px solid var(--c);background:rgba(0,20,40,.55);display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;letter-spacing:1px;box-shadow:0 0 14px rgba(0,229,255,.5)}
+.tb.on{background:var(--c);color:#001}
+#tl,#tr{position:absolute;bottom:calc(18px + env(safe-area-inset-bottom,0px));display:none;gap:14px;align-items:flex-end}
+#tl{left:calc(16px + env(safe-area-inset-left,0px))}
+#tr{right:calc(16px + env(safe-area-inset-right,0px))}
+#fly{width:100px;height:100px;border-color:var(--m);box-shadow:0 0 16px var(--m);font-size:20px}
+@media(pointer:coarse){#tl,#tr{display:flex}#spd{bottom:auto;top:58px;font-size:20px;padding:5px 10px}.pill{font-size:11px;padding:5px 9px}#bars{width:34vw}#lives{right:calc(16px + env(safe-area-inset-right,0px))}}
+@media(max-height:520px){h1{font-size:34px}.help{display:none}#menu{gap:8px;padding:8px}button{padding:10px 16px}}
 .help{max-width:560px;font-size:13px;line-height:1.7;opacity:.85}
 #intro{position:fixed;inset:0;background:#000;z-index:10;overflow:hidden;cursor:pointer}
 #ic{position:absolute;inset:0;width:100%;height:100%}
@@ -59,6 +67,8 @@ kbd{border:1px solid #fff6;border-radius:5px;padding:1px 7px;background:#0006}
   <div class="pill" id="lives">♥♥♥</div>
   <div class="pill" id="spd"><span id="sv">0</span> <small>KM/H</small></div>
   <div id="fvf" style="position:absolute;right:16px;bottom:16px;border:2px solid #00e5ff;border-radius:10px;box-shadow:0 0 18px #00e5ff"><span style="position:absolute;top:4px;left:8px;font-size:11px;letter-spacing:2px;text-shadow:0 0 6px #000">FRONT VIEW</span></div>
+  <div id="tl"><div class="tb" data-k="arrowleft" style="font-size:30px">◀</div><div class="tb" data-k="arrowright" style="font-size:30px">▶</div></div>
+  <div id="tr"><div class="tb" data-k="arrowdown">BRAKE</div><div class="tb" id="fly" data-k="f">FLY</div></div>
   <div id="msg"></div>
 </div>
 <div id="intro">
@@ -79,6 +89,7 @@ kbd{border:1px solid #fff6;border-radius:5px;padding:1px 7px;background:#0006}
   <button id="go">START ENGINE</button>
   <div class="help"><kbd>←</kbd> <kbd>→</kbd> steer · <kbd>↑</kbd> accelerate · <kbd>↓</kbd> brake · hold <kbd>F</kbd> to fly (uses energy)<br>
   Fly <b>over</b> the low neon barriers. Drive <b>under</b> the high laser gates. Reach the FINISH gate!</div>
+  <div class="help" id="th" style="display:none"><b>Touch:</b> ◀ ▶ steer · hold FLY to fly · BRAKE to slow (auto-gas is on). Best in landscape.</div>
   <div id="result" style="font-size:22px;font-weight:700"></div>
 </div>
 <script src="lib/three.min.js"></script>
@@ -290,6 +301,12 @@ addEventListener('keyup',e=>{keys[e.key.toLowerCase()]=false;});
 addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();});
 
 // ---------- loop ----------
+const TOUCH=matchMedia('(pointer:coarse)').matches;
+if(TOUCH)$('th').style.display='block';
+document.querySelectorAll('.tb').forEach(b=>{const k=b.dataset.k;
+ b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=true;b.classList.add('on');});
+ ['pointerup','pointercancel','pointerleave'].forEach(ev=>b.addEventListener(ev,e=>{e.preventDefault();keys[k]=false;b.classList.remove('on');}));
+ b.addEventListener('contextmenu',e=>e.preventDefault());});
 (function intro(){
  const ic=$('ic'),g=ic.getContext('2d');let W,H,st=[],on=true,warp=0,started=false,done=false,timers=[];
  function rs(){W=ic.width=innerWidth;H=ic.height=innerHeight;st=Array.from({length:240},()=>({x:Math.random()*W,y:Math.random()*H,z:Math.random()*2+.4}));}
@@ -322,7 +339,7 @@ function frame(now){
   const S=STAGES[stage];
   if(state==='play'){
     // speed
-    if(keys.arrowup)speed+=S.max*.45*dt;else speed-=S.max*.12*dt;
+    if(keys.arrowup||(TOUCH&&!keys.arrowdown))speed+=S.max*.45*dt;else speed-=S.max*.12*dt;
     if(keys.arrowdown)speed-=S.max*.9*dt;
     speed=Math.max(S.max*.25,Math.min(S.max,speed));
     // steering
@@ -365,7 +382,7 @@ function frame(now){
   orbs.forEach((o,i)=>{o.rotation.x+=dt;o.rotation.y+=dt*1.3;if(o.position.z>cz+20){o.position.z=cz-500;o.position.x=(Math.random()-.5)*160;}});
   obs.forEach(o=>{if(o.m.userData.anim&&Math.abs(o.z-cz)<300)o.m.userData.anim(t);});
   // camera
-  const fov=70+(speed/S.max)*20+(flying?6:0);cam.fov+=(fov-cam.fov)*dt*4;cam.updateProjectionMatrix();
+  const fov=(70+(speed/S.max)*20+(flying?6:0))*(innerWidth<innerHeight?1.3:1);cam.fov+=(fov-cam.fov)*dt*4;cam.updateProjectionMatrix();
   shake=Math.max(0,shake-dt*2);
   cam.position.set(car.x*.6+(Math.random()-.5)*shake,car.y*.7+4.6+(Math.random()-.5)*shake,cz+11);
   cam.lookAt(car.x*.8,car.y*.6+1.2,cz-14);
@@ -383,8 +400,8 @@ function frame(now){
   }
   renderer.setScissorTest(false);renderer.setViewport(0,0,innerWidth,innerHeight);renderer.render(scene,cam);
   if(state==='play'||state==='count'){
-    const w=Math.min(300,innerWidth*.4),h=Math.round(w*.62),x=innerWidth-16-w,y=16;
-    const f=$('fvf');f.style.width=w+'px';f.style.height=h+'px';
+    const w=TOUCH?Math.min(220,innerWidth*.32):Math.min(300,innerWidth*.4),h=Math.round(w*.62),x=innerWidth-16-w,y=TOUCH?Math.round(innerHeight-58-h):16;
+    const f=$('fvf');f.style.width=w+'px';f.style.height=h+'px';f.style.bottom=y+'px';
     fcam.aspect=w/h;fcam.updateProjectionMatrix();
     fcam.position.set(car.x+2.6,car.y+2.2,cz-8.5);fcam.lookAt(car.x,car.y+.9,cz);
     renderer.setScissorTest(true);renderer.setScissor(x,y,w,h);renderer.setViewport(x,y,w,h);
